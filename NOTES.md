@@ -108,6 +108,27 @@ In version 2, he sends future spots to 0, but real transformers need  a more fle
  A standard mathematical function that takes any list of raw point scores and converts them into positive percentages that add up to 1.0 (100%)
 
 
- # August 25 (1hr)
+ # August 25 (1.5hr)
+
+### Karpath Video Cont'd
+
+#### Shows how transformer models scale their attention scores by dividing by a function before passing to softmax.
+
+
+Imagine a room where 64 people are whispering opinions to you. Because everyone speaks softly, you can weigh all their thoughts together. But if you pass all their voices through a massive amplifier, the slightly loudest voice becomes a deafening roar while everyone else gets drowned out completely. You end up listening to only one person. Scaling down attention scores keeps everyone at a balanced conversational level so the model can aggregate insights from multiple words at once.
+
+With the scaling division (Balanced): Word A gets 25%, Word B gets 60%, Word C gets 15%. The AI listens to a blend of all three words.
+
+
+### Dictionary:
+Variance: A measurement of how widely spread out a group of numbers is from their average.\
+
+Peaky: When a probability distribution gets squished so hard that one option shoots up to nearly $1.0$ ($100\%$) while all others drop near $0\%$, turning a subtle comparison into an absolute "winner-take-all" outcome.
+
+Query (q): A word asking a question (e.g., "Where is the action in this sentence?").
+
+Key (k): A word advertising its contents (e.g., "I am a verb!")
+
+ 
 
  
