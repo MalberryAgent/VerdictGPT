@@ -21,7 +21,7 @@ Version: 5.0.1
 - Name: wandb - 
 Version: 0.28.2
 
-## August 23 - (2hr)
+## August 23 - (4hr)
 Watching first vid tutorial!
 ### Let’s build ChatGPT: From scratch, in code, , spelled out. - Andrej Karpathy
 
@@ -106,3 +106,8 @@ In version 2, he sends future spots to 0, but real transformers need  a more fle
 
 ### Dictionary - softmax:
  A standard mathematical function that takes any list of raw point scores and converts them into positive percentages that add up to 1.0 (100%)
+
+
+ # August 25 (1hr)
+
+ 
