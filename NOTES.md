@@ -123,7 +123,7 @@ _____________________________________
 
 
 
- # August 25 (3hr)
+ ## August 25 (3hr)
 
 ### Karpath Video Cont'd
 
@@ -186,6 +186,8 @@ Key (k): A word advertising its contents (e.g., "I am a verb!")
 Starts with data preparation and tokenizations, where the encoder takes every character in the dataset and turns it into a unique integer (ID), Then the text is cut into short snippets  and then multiple of those snippets are stacked into parallel groups so the computer can process as any examples in parallel. Before building the complex attention logic, a basic baseline model only looks at the single current character, and guesses what comes next based on statistics, it ignores the surrounding context. Then single head attention, there are 3 roles, (Query, Key,Value) and every character is given 3 roles: Q:what am I searching for, K: what information do I hold, V: What message do I pass along. Then the model compare these to calculate how relevant past characters are to the current one, and a rule is that (-inf) blocks characters from seeing into the future (no cheating!). The relevency gets scored into percentages, which pull I weighted amount of information from past characters. Now the next layer of attention, multi head. Instead of relying on once reader the model splits into several smaller heads working in parallel. One might do grammar rules, while the other tracks themes. And their findings get glued back together in the end. On top of attention, each character passes through its own private calculation step, so its like individual thinking time to digest what it just learned  from other characters before moving forward, this is called Feed Forward Network. Then blocks stack and training must be kept stable to improve the model. First, transformer blocks, where the attention dn reflection step go into one single block, and multiple of those blocks get stacked on top of each other to make the model smarter. Then original data bypasses each step and gets added to the output, to create a direct route for feedback so the model won’t forget early information, like a highway. Then normalization layers continuously keep calculations at a manageable size so the number dont blow up, and become innacurate. Finally it’s time for predicting and generating new text. The final numbers are converted into percentage changes for eery character in the dictionary, to move toward the final output, and finally the auto-regressive loop. The model picks the most likely next character, pastes it onto the end of the text, and feeds the new longer string into itself to predict the next letter, generating complete sentence one character at a time.
 
 ### DONE VIDEO
+
+_____________________________
 
 
 
@@ -307,3 +309,79 @@ The model stacks twelve of these Blocks on top of each other. A token enters as 
 When training, the model sees the correct answer and measures how wrong it was. When generating, it picks tokens one at a time based on those scores, adds them to the sequence, and runs the whole thing again, building text token by token.
 That's the journey: a token comes in empty-handed, flows through twelve layers of listening and thinking, exits with deep understanding, and tells the caller which word probably comes next. The model repeats this thousands of times during training until it learns language, or generates text by repeatedly asking "what's next?" until a full response is built.
 
+
+## August 27 (20m)
+
+### Tokenizer.py digest
+
+strategy to tokenize — take raw string of text to integers to be vocab for possible elements, characters → integers. This file does exactly that. But instead of converting each character individually (too many numbers), it converts chunks of characters (words, subwords, numbers) into unique integers. It's like having a dictionary where each entry is not a single letter, but a meaningful piece of text. Then when the model reads text, it looks up those chunks and converts them into numbers. 
+
+What's a tokenizer?
+A tokenizer is a machine that converts text ↔ numbers.
+* Text → Numbers (encode): "hello" → [1000, 2034]
+* Numbers → Text (decode): [1000, 2034] → "hello"
+Then a process runs:Like you're building a dictionary. You read a huge library, count which words/phrases appear most, and decide to include the top 32,760 in your dictionary. Then you print that dictionary into a book (tiktoken encoding) for fast lookup.
+
+#### Syntax is:
+Think of it as the grammar rules of the language. If you break these rules, Python will throw a SyntaxError and refuse to run your code.
+
+_____
+
+Process
+
+"Hi there = [41, 56, 23, 67, 23, 67, 46, 15]" — converting text to integers.
+This file does that, plus more:
+1. Defines special markers (BOS, user_start, etc.) to structure conversations
+2. Trains a tokenizer by learning which text chunks are common (rustbpe)
+3. Provides fast lookup to convert text ↔ numbers (tiktoken)
+4. Handles conversations — converts a chat back-and-forth into tokens, marking which parts to train on
+5. Supports RLHF — renders conversations for reinforcement learning (removing the target response)
+
+
+### Summary of Tokenzer.py
+When the model reads text, the tokenizer breaks it into chunks and converts each to a number. When the model outputs numbers, the tokenizer translates back to readable text.
+For conversations, the tokenizer does something smart: it marks which parts the model should learn from. User messages get marked "don't train" (input). Assistant responses get marked "train" (the model should learn these). This focuses training on teaching the model to respond well.
+It's the translator between human text and machine numbers.
+__________
+
+### scripts/base_train.py digest
+
+Quick overview:
+ training the bigram model by running it through thousands of training loops to teach it using a tool called an optimizer.This file does exactly that, but at a massive scale. It orchestrates the entire training process: loading data, building the model, setting up optimization, and then running thousands of training steps where the model reads text, predicts the next token, measures how wrong it was (loss), and nudges its weights in the right direction (backprop + optimizer).
+
+
+* --depth — how many transformer blocks (12, 20, 50, etc.)
+* --device-batch-size — how many sequences to process at once on one GPU
+* --total-batch-size — total sequences across all GPUs (determines how many gradient accumulation steps)
+* --matrix-lr, --embedding-lr — learning rates for different parameter types
+* --eval-every — how often to evaluate validation loss
+* --sample-every — how often to generate samples to see what the model learned
+
+Summary:
+The file is the training orchestrator. It sets up command-line arguments for every aspect of training (model size, batch size, learning rates), then runs the core training loop thousands of times.
+It detects your hardware (GPU/CPU), loads the tokenizer, builds the model, and initializes it with random weights. Using scaling laws research, it automatically calculates optimal batch sizes and learning rates based on model size.
+Then comes the loop: load a batch of text, run through the model (forward pass), compare predictions to ground truth (loss), compute gradients (backward pass), and update weights (optimizer step). Every few iterations, it evaluates on unseen text, generates samples to see if learning is working, and saves checkpoints.
+The script runs thousands of times, watching loss decrease as the model learns. By the end, you have a trained model.
+
+________
+
+### Optim.py digest
+
+It reads the gradients (which tell you "how much did this weight contribute to the error?") and carefully adjusts each weight to reduce that error. This file contains two optimizers: AdamW (for embeddings and scalars) and Muon (for matrix weights), combined into one.
+
+Your notes describe the training loop: "The code grabs text, measure the loss, calculates what number caused error, then nudges in the right direction slightly."
+This file provides the "nudge":
+1. AdamW nudges embeddings and scalars using momentum + adaptive learning rates
+2. Muon nudges weight matrices using orthogonalization (rotation-based updates)
+3. Distributed sync ensures all GPUs agree on the updates
+4. Async communication overlaps with computation for speed
+The model gets nudged thousands of times, and gradually, loss decreases.
+
+Short Paragraph (150 words):
+The Journey of optim.py
+The file contains two optimizers working together. AdamW nudges embeddings and scalars using momentum (remembering past directions) and adaptive learning rates (moving faster or slower based on gradient magnitude). Muon nudges matrix weights differently — instead of moving arbitrarily, it finds the nearest "rotation" (orthogonal matrix) to apply, based on research showing this is more stable for training.
+For distributed training on multiple GPUs, the optimizers sync gradients across devices, with large parameters split across GPUs to save memory (ZeRO-2 style). Communication happens asynchronously so GPUs don't sit idle — while one GPU finishes syncing, others compute updates.
+The combined MuonAdamW class orchestrates this in three phases: launch communication, compute updates, wait for synchronization. Repeat thousands of times during training, and the model learns.
+
+
+## done nanochat file digest---
