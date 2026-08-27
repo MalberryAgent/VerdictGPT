@@ -187,4 +187,123 @@ Starts with data preparation and tokenizations, where the encoder takes every ch
 
 ### DONE VIDEO
 
+
+
+## August 26 (3hr)
+
+### Nanochet repo study
+
+### Nanochat/gpt.py digest
+I notice the first couple sections are “preparing”, is the foundation and configuration before anything gets done, it lets the things mentioned later in the important code exist. Like importing libraries like torch to do the neural network math, taking contents from other files that should be taken into consideration, and even listing settings and instructions for developers as context. 
+
+Think of coding as a recipe book with a strict grammar. All it is doing is giving a machine step-by-step instructions to turn inputs into actions.
+
+#### These are the answer to the questions I had, plus some more notes to understand this 1st part of the gpt.py digest. ->
+#### Class
+Blueprint for making identical copies of things, like a recipe, so when It went class CasualSalfAttention, all its doing is saying, this is what casualselfattention looks like, everytime someone creates one, here’s what goes inside it. No settings, it’s a template, the settings only exist when you create an instance from the template.
+####  _init_
+This is the inittialization function, the tings that runs every time you create a  new copy from the template, it’s the moment the baker is cooking the recipe. So when you make a new casualselfattention, python will auto run init, and a bunch of other assignments happened (self.n_head = …), which create that specific copies internal stuff. 
+#### Self
+Eg. (self.layer_idx = layer_idx
+        self.n_head = config.n_head
+        self.n_kv_head = config.n_kv_head
+        self.n_embd = config.n_embd
+        self.head_dim = self.n_embd //
+)
+Self means, this specific copy im talking about right now, when you write self.n_head = config.n_head, your saying “for this specific copy, store the value config.n_head inside a slot called n_head”, later when you use self.n_head in the code, your saying give me n_head for this specific copy. Have cookies made from same recipe, each one is own cookie (self), when you bite into this cookie and it’s sweet, that’s because of self.
+
+In __init__:
+self.n_head = 6  # "This particular attention layer has 6 heads"
+
+Later in forward():
+for each_head in range(self.n_head):  # "Use the 6 heads from THIS layer"
+
+
+
+
+#### I read it but dont have much of a background, so getting a digest going through everything In there, mainly about the attention part of the code.
+
+#### super()._init_()?
+super() means: call the parents version of this function. Its like before I run my own stuff, run this setup code first.
+
+#### What does nn.?? Mean
+Sort for torch.nn its the lib inside PyTorch which does all the math like matrices, etc.
+
+#### How does QKV fit into everything.
+You have concept of each one individually, but it’s like, what am I, name tag, and info it gets.
+
+#### Attention process
+Each token has QKV.
+Each token with Q asks which tokens in my past have info I need, It compares its Q against all the past tokens K’s, asking do your nametags answer my questions. The token with the best matching Ks say yes, here is my value and then hand over there V vectors. The current token blends together all those values, weighted by how well did you K match my Q into one final message.
+
+q = self.c_q(x)  # Turn current embedding into a "question"
+k = self.c_k(x)  # Turn embeddings into "nametags"
+v = self.c_v(x)  # Prepare the "answers" to share
+
+
+### Code definition: kv_cache:
+if kv_cache is None:
+    y = flash_attn.flash_attn_func(q, k, v, causal=True, window_size=window_size)
+else:
+    k_cache, v_cache = kv_cache.get_layer_cache(self.layer_idx)
+    y = flash_attn.flash_attn_with_kvcache(...)
+    if self.layer_idx == kv_cache.n_layers - 1:
+        kv_cache.advance(T)
+Two paths — two situations:
+Path 1: Training (if kv_cache is None:)
+We have the whole sequence available. Run attention normally: compare this token's Q against all past Ks and Vs.
+Path 2: Generating one token at a time (else:)
+We're generating text word by word. We already computed K/V for all previous tokens in earlier steps. Don't recompute them — just grab them from the cache.
+
+k_cache, v_cache = kv_cache.get_layer_cache(self.layer_idx)
+"Hey cache, give me the K and V you saved from before for this layer."
+
+y = flash_attn.flash_attn_with_kvcache(q, k_cache, v_cache, k=k, v=v, ...)
+"Run attention: compare NEW token's Q against CACHED old K/V, plus this new token's fresh K/V."
+
+if self.layer_idx == kv_cache.n_layers - 1:
+    kv_cache.advance(T)
+"We're done with all layers. Tell the cache: 'Remember THIS token for next time.'"
+
+
+### Im finding that a lot of code is one of these. Setting up something, giving instructions, telling what other code to do, defining code, telling what computer does. It’s either interacting with itself or the computer. Its like a guy telling someone how to do something, asking for something, or giving instructions.
+
+
+### GPT _init_ - Building the entire model
+
+Some notes: Embeddings have layers, right now, an embedding that takes the integers that were once the characters, and converts them into vectors.
  
+### Generate - making the model product text
+"The model picks the most likely next character, pastes it onto the end of the text, and feeds the new longer string into itself to predict the next letter, generating complete sentence one character at a time."
+ First code solidifies it’s not training, it’s generate, “We're not training, so don't compute gradients. Turn off all training machinery.”
+
+Start: ids = [5, 42, 13]  (3 tokens)
+
+Iteration 1:
+  forward(ids) → logits for next token
+  Pick token 7 (based on scores + sampling)
+  ids = [5, 42, 13, 7]
+  Yield: 7
+
+Iteration 2:
+  forward(ids) → logits for next token
+  Pick token 99
+  ids = [5, 42, 13, 7, 99]
+  Yield: 99
+
+Iteration 3:
+  forward(ids) → logits for next token
+  Pick token 42
+  ids = [5, 42, 13, 7, 99, 42]
+  Yield: 42
+
+Run loop max token times ^^^
+
+### gpt.py in a paragraph
+The file is essentially a blueprint for a machine that reads tokens (numbers representing words) and predicts what comes next. Think of it like teaching someone to write by showing them thousands of examples, until they learn patterns.
+The file starts by defining the settings: how many layers deep, how wide each layer is, how many vocabulary words exist. Then it builds the actual machine piece by piece.
+First come the building blocks. There's an attention layer, which is like a student reading a sentence and asking, "which words from before help me understand this current word?" It can look back at the past, gather relevant information, and blend it together. Then there's a thinking layer (MLP), like private desk time where each word processes what it just learned without talking to others. A Block combines both: listen to context, then think independently.
+The model stacks twelve of these Blocks on top of each other. A token enters as a number, gets converted to a 768-dimensional vector (think of it as a rich description of that word), flows through all twelve Blocks getting refined each time, then comes out the other end as scores predicting every possible next token.
+When training, the model sees the correct answer and measures how wrong it was. When generating, it picks tokens one at a time based on those scores, adds them to the sequence, and runs the whole thing again, building text token by token.
+That's the journey: a token comes in empty-handed, flows through twelve layers of listening and thinking, exits with deep understanding, and tells the caller which word probably comes next. The model repeats this thousands of times during training until it learns language, or generates text by repeatedly asking "what's next?" until a full response is built.
+
