@@ -388,7 +388,7 @@ The combined MuonAdamW class orchestrates this in three phases: launch communica
 
 ________
 
-## August 28 (2hr)
+## August 28 (4hr)
 
 #### Kicking off training (1st dev operation on project)
 Firstly there is a script i have to run called speedrun.sh, its basically a sequnce of many terminal commands i would have to manaully input, but this way it does it at once, and i can monitor whats happening. one thing, is that i have to specify to the command because it also includes some downloading and training, and the script expects that to run on a more powerful gpu i have rented in runpod, so it will over capazatize it. So i have to specifify in a reletive command, that im using a rtx 4090, so it will adjust, but it will still take 1.5-2 hours.
