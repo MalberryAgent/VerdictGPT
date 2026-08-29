@@ -464,3 +464,17 @@ Something they found interesting in study: In studies, having same data fro to l
 After 1 hour of studying: You know the history facts perfectly.
 After 16 hours of studying: You start memorizing your teacher’s exact catchphrases. A mathematical tracker would say you are wasting time and "overfitting" to the teacher's vocabulary.
 The Result: On exam day, because you spent so much time reading high-quality writing, your essays are beautifully written, persuasive, and perfectly formatted. The human examiner gives you an A+, ignoring the fact that you over-studied.
+
+Then A bit more details on  building the AI judge (reward modeling/RM). They build the RM before training in order to score its answers. The final thing is reading a prompt and response,  then output a single quality score. Humans grade the answers on quality, truth and bias, and balance the scoring system so a standard human written answer is 0.
+___________
+
+## August 29 ()
+
+Starting to build up solid VerdictGPT in isolated folder
+Added seperate instance in terminal (.venv) so its isolated, downaloaded packages, transformers, torch, datasets.
+Hit 2 big problems related to the gpu nd network volume, so it wasnt loading the dataset. I only had 50gb provisioned of storage, so i updated it to 100 after a bit of detecting the problem. I found in the end that the smaller NV matched the ID of the migrated pod, so added volume. After that, ran the command and dataset finally loaded:
+- 116,722 train examples, 6,447 validation, 6,553 test
+- Structure: each example has `post` (long Reddit post, the input) and 
+  `summary` (short human-written summary, the target) -- this is the 
+  prompt/target pair shape Phase 3 training will use
+
