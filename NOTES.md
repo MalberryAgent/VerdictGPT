@@ -310,7 +310,7 @@ When training, the model sees the correct answer and measures how wrong it was. 
 That's the journey: a token comes in empty-handed, flows through twelve layers of listening and thinking, exits with deep understanding, and tells the caller which word probably comes next. The model repeats this thousands of times during training until it learns language, or generates text by repeatedly asking "what's next?" until a full response is built.
 
 
-## August 27 (20m)
+## August 27 (1hr)
 
 ### Tokenizer.py digest
 
@@ -384,4 +384,61 @@ For distributed training on multiple GPUs, the optimizers sync gradients across 
 The combined MuonAdamW class orchestrates this in three phases: launch communication, compute updates, wait for synchronization. Repeat thousands of times during training, and the model learns.
 
 
-## done nanochat file digest---
+## done nanochat file digest--
+
+________
+
+## August 28 (2hr)
+
+#### Kicking off training (1st dev operation on project)
+Firstly there is a script i have to run called speedrun.sh, its basically a sequnce of many terminal commands i would have to manaully input, but this way it does it at once, and i can monitor whats happening. one thing, is that i have to specify to the command because it also includes some downloading and training, and the script expects that to run on a more powerful gpu i have rented in runpod, so it will over capazatize it. So i have to specifify in a reletive command, that im using a rtx 4090, so it will adjust, but it will still take 1.5-2 hours.
+Keep having to mention claude to explain more, not mention future choices because it makes it confusing on what to do. I need specific, sequenced and clear steps with mini explanations so i can learn a bit on the way.
+
+Ok, started the training run in nanochat. its weird, i though it was going to be in Verdict, but no, theres some pre done stuff in nanochat that makes it easier, so we shall see. then i had to download some things, then did a thing were it teleports to code running in the runpod, then ran the training command and its going to run for hours, and i can close my laptop. have to check on it every now and thenSpecifically, this one script does three things in sequence:
+
+Builds a tokenizer — the thing that turns text into numbers the model can read.
+Pretrains the model — reads a large pile of web text repeatedly, learns to predict the next word, over and over, until it's a working language model. This is the part you already understand conceptually and read the code for.
+Does a first SFT pass — teaches it to respond in a conversational format instead of just rambling.
+
+End result: a model file sitting on your pod that you can actually talk to (chat_cli). It'll be rough — small, undertrained, "kindergartener" quality, as expected at this scale.
+
+##### Its been 5 hours in training
+its on step 779 out of 950 and 83% done, and the loss is down to 1.15, from 5.19, which is insane. its about 1 hour from completion. One thing I notice, is that throughout training, you expect loss to go down a tiny bit per turn, sequentionaly, but instead, its like 1.17 -> 1.22 -> 1.24 -> 1.21 -> 1.14 -> 1.28 -> 1.23 -> 1.15. Because each turn is a seperate instance, liek rinsing and repeating, and theres another instance that sees how it does, compares, it and improves it by a fraction of decimal, thats why it takes so long.
+
+Just a mention before i move on or forget. for loggine purposes. i have depth of 12, i had to change that to 12 from 20 before training, because then the process would have demolished my GPU.
+
+### training + base model complete!
+Phase 2 complete — base model + SFT
+- Architecture: depth 12, 286M params
+- Training: 934 steps, 4 hours, single RTX 4090
+- Final loss: 1.15, ChatCORE: 0.0847, HumanEval: 9.15%
+- Sample: asked "why is the sky blue" — got grammatically coherent but 
+  scientifically wrong/circular answer. Expected at this scale — proves 
+  the model learned English structure without learning real facts, which 
+  makes sense given tiny size and short training time.
+- Checkpoint backed up to /workspace/nanochat_checkpoints
+
+Here was the first answer of VerdictGPT:
+____________________________
+NanoChat Interactive Mode
+--------------------------------------------------
+Type 'quit' or 'exit' to end the conversation
+Type 'clear' to start a new conversation
+--------------------------------------------------
+
+User: Why is the sky blue?
+Assistant: The sky is indeed blue, primarily due to the way our eyes perceive the color of the Earth. Our eyes are constantly adjusting to see the blue and white of the sky, which is why we can see it on a clear day. 
+
+The reason for this is that our brains are wired to take in the colors of the sky, and it's easy to see the blue and white of the Earth in the background. However, when we look at the sky, we're essentially seeing the color of the blue and white of the Earth, which is why we can see it. This is why the sky is blue.
+
+Additionally, our brains are also wired to recognize the color of the Earth, which is why we can see it. The blue and white of the sky is a result of the way our eyes detect the blue and white of the Earth, which is why we can see it on a clear day.<|assistant_end|>
+
+User: exit
+Goodbye!
+(nanochat) root@b869152993a9:/workspace/nanochat# 
+
+____________________
+
+yeyyayeyayeyayy!!!! It workeeddddd!!!
+
+Im now handing off to another chat, because the intials ones got to much in it, its starting to hallucinate.
