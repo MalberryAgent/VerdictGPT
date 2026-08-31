@@ -468,7 +468,7 @@ The Result: On exam day, because you spent so much time reading high-quality wri
 Then A bit more details on  building the AI judge (reward modeling/RM). They build the RM before training in order to score its answers. The final thing is reading a prompt and response,  then output a single quality score. Humans grade the answers on quality, truth and bias, and balance the scoring system so a standard human written answer is 0.
 ___________
 
-## August 29 ()
+## August 29 (2hr)
 
 Starting to build up solid VerdictGPT in isolated folder
 Added seperate instance in terminal (.venv) so its isolated, downaloaded packages, transformers, torch, datasets.
@@ -478,3 +478,8 @@ Hit 2 big problems related to the gpu nd network volume, so it wasnt loading the
   `summary` (short human-written summary, the target) -- this is the 
   prompt/target pair shape Phase 3 training will use
 
+_____
+## August 31 (.5hr)
+
+#### Finally done phase 3, moving to phase 4, which is about checkpoint loading.
+My model is a massive recipe with 300 million parameters/knobs. training is the process of slowly and percicley turning every knob to better values
