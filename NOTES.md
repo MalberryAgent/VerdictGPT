@@ -12,7 +12,7 @@
 ___________________________________________
 
 
-## August 22 - (3hr)
+## August 22 - (4hr)
 Got repo dialed and connected, then started and connected RunPod, created pod gpu and connected through ssh, downloaded packages, general set up stuff. When running pip install for packages, i ran into roadblock bug, and found i was not in the repo folder, so had to do cd /VerdictGPT, then added the file to it, so that i can downlaod all the packages on that file, so note, you cant download packages, etc, in a directory, you have to make a file, eg, requirements.txt.
 #### Package Versions (future reference)
 - Name: torch - 
@@ -479,7 +479,54 @@ Hit 2 big problems related to the gpu nd network volume, so it wasnt loading the
   prompt/target pair shape Phase 3 training will use
 
 _____
-## August 31 (.5hr)
+## August 31 (2hr)
 
 #### Finally done phase 3, moving to phase 4, which is about checkpoint loading.
-My model is a massive recipe with 300 million parameters/knobs. training is the process of slowly and percicley turning every knob to better values
+My model is a massive recipe with 300 million parameters/knobs. training is the process of slowly and percicley turning every knob to better values.
+
+Time to write the checkpoint loading file myself, through terminal. here are the notes about code and progress:
+Had to take parts from nanochats repo borrowing a single function, specifies specific parts instructions, like where to take from, etc.
+pip install = downloading pre configured package.
+#### Base checkpoint loading -- working
+
+What: Wrote load_base_model.py, reused nanochat's own load_model() 
+function instead of rewriting checkpoint loading myself.
+
+Problems hit + fixes:
+- nanochat not importable -> not a real pip package, used PYTHONPATH instead
+- rustbpe missing -> just pip install rustbpe (not a Rust build, despite 
+  old tutorials saying so)
+- tiktoken missing -> pip install tiktoken
+
+Env vars needed every session (4 total):
+HF_HOME, HF_HUB_DISABLE_XET, NANOCHAT_BASE_DIR, PYTHONPATH
+-> should turn into one setup script soon
+
+Result: base checkpoint (step 1680, pre-SFT) loads successfully from my 
+own code.
+_
+#### Base model generation test -- repetition loop found
+
+What: tested load_base_model.py with open-ended prompt ("The best way to 
+learn a new skill is..."), 30 tokens.
+
+Result: model gets stuck in short repetition loops ("is is is...", 
+"the the the..."), even after trying top_k=50 and temperature=1.5.
+
+Why: base checkpoint only trained 1680 steps, small for a 286M param model. 
+Repetition loops are a known failure mode of undertrained language models, 
+not a bug in the loading code.
+
+Why this is still fine for Phase 3: SFT fine-tunes on a narrower, more 
+structured task (post -> summary), not open-ended continuation. Reasonable 
+to expect meaningfully better behavior after fine-tuning, even with this 
+base model quality.
+
+
+### Key concepts:
+Backpropagation is how an AI adjusts its internal settings after making a mistake.
+If backpropagation finds the mistakes, the optimizer is the worker that actually turns the knobs to fix them.
+A tokenizer is the translator between human words and AI numbers.
+Overfitting happens when an AI memorizes its practice data instead of actually learning the underlying patterns.
+A checkpoint is a snapshot file stored on your computer that saves the exact positions of all the AI's internal math knobs (weights) at a specific moment during training.
+
