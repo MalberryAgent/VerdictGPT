@@ -529,4 +529,12 @@ If backpropagation finds the mistakes, the optimizer is the worker that actually
 A tokenizer is the translator between human words and AI numbers.
 Overfitting happens when an AI memorizes its practice data instead of actually learning the underlying patterns.
 A checkpoint is a snapshot file stored on your computer that saves the exact positions of all the AI's internal math knobs (weights) at a specific moment during training.
+A gradient is just a measurement of slope—it tells you which direction error is increasing, and how steeply.
 
+_________
+## September 1 ()
+
+#### Phase 3 SFT: Data format and training loop build:
+Use nanochat convo format instead of hallucinated template, and returns ids, masking marks whihc tokens actually count towards loss. 
+##### Learning rate debugging
+First trained test, loss rose steadily instead of dropping, it was because the matric was scaled down at default for huge batch, this was fixed by scaling all four down. But still slowly lowered after that, it was because it was missing gradient asumalaiton, was taking 1 optimizer step per example, which is noisy. fixed by accumalating gradients over 8 examples before each optimzer step, matching nanochats approach.
