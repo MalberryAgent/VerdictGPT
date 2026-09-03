@@ -532,9 +532,50 @@ A checkpoint is a snapshot file stored on your computer that saves the exact pos
 A gradient is just a measurement of slope—it tells you which direction error is increasing, and how steeply.
 
 _________
-## September 1 ()
+## September 1 (5 hr)
 
 #### Phase 3 SFT: Data format and training loop build:
 Use nanochat convo format instead of hallucinated template, and returns ids, masking marks whihc tokens actually count towards loss. 
 ##### Learning rate debugging
-First trained test, loss rose steadily instead of dropping, it was because the matric was scaled down at default for huge batch, this was fixed by scaling all four down. But still slowly lowered after that, it was because it was missing gradient asumalaiton, was taking 1 optimizer step per example, which is noisy. fixed by accumalating gradients over 8 examples before each optimzer step, matching nanochats approach.
+First trained test, loss rose steadily instead of dropping, it was because the matric was scaled down at default for huge batch, this was fixed by scaling all four down. But still slowly lowered after that, it was because it was missing gradient asumalaiton, was taking 1 optimizer step per example, which is noisy. fixed by accumalating gradients over 8 examples before each optimzer step, matching nanochats approach. Then loss dropped cleanly.
+
+#### First real test gen:
+Loaded best small run checkpoint, got summary on unseen validation example. I was short and on topic, but hallucinated and incorrect. 
+#### Decicsion to comence big trianing run. 
+2 epocks of training (2300000 steps), targeting real quality, not just demo. Estimate 30 hours. Added resume support, so check for checkooints loads things, so in case of crash, not starting from nothing again.
+Then disaster striks, it crashed, because the network volume and compute was tuned too low. Fixed with new resume of checkpoint, delete previous one right away.
+Found the screen isolates from any exterior problems, as long as the pod is running, its working. By step 180k, training was healthy. Then failed again.
+Conducted experiemnts, checking how quality improved over different parameters. Then after 9 experiments, concluded that 286M (12 depth) models content accuracy ceiling is likely a capacity limit, not training procedure problem. Decided to retrain the base model more and bigger (900M - 20 Depth) raher than keep tuning SFT. Cost 30 hours, 3320, total steps. its going alot, taking 1900 mins, and 30k tok/sec which is crazy.
+#### Depth=20 retrain — hit repeated infra issues, all fixed
+
+Crash 1: accidentally typed text into the training terminal while attached, 
+killed the process. Lesson: never type/paste into a live training screen 
+session unless it's an intentional command.
+
+Crash 2 (same run, after fixing crash 1): resumed, hit a chain of missing 
+folders one at a time — tokenizer, then checkpoint folder structure 
+(needed base_checkpoints/d20, not just d20), then the dataset folder 
+(base_data_climbmix) was never copied to /workspace at all. Fixed each, 
+should have checked full folder structure once instead of fixing one 
+piece at a time.
+
+Crash 3: disk quota again — this script has no auto-cleanup of old 
+checkpoints (unlike our SFT scripts), so checkpoints piled up over time 
+and filled the volume. Deleted old depth=12 checkpoints (already tested, 
+no longer needed) to free space, resized volume 100GB -> 250GB for real 
+headroom, and added a small external cleanup loop (separate screen 
+session) that keeps only the 2 most recent checkpoints automatically.
+
+Each time: recovered by resuming from the last good checkpoint using 
+nanochat's built-in --resume-from-step flag. One checkpoint file was 
+found corrupted/truncated from a mid-crash write (same signature both 
+times) — always check file sizes match before resuming from a given step, 
+don't assume the last save is intact.
+
+Status: training resumed cleanly, loss recovering normally each time 
+after a brief expected spike on resume. No progress lost beyond the 
+few minutes since the last checkpoint each time.
+
+## September 2 (.5hr)
+
+Watched video by 3blue1brown about machine learning, more context on whats going on under the hood. then checked in on trainng, and added cleanup function on another screen to delete the oldest checkpoint 5 mins after a new one is added, so no overload. also caught up writing the notes.
