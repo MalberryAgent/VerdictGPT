@@ -579,3 +579,51 @@ few minutes since the last checkpoint each time.
 ## September 2 (.5hr)
 
 Watched video by 3blue1brown about machine learning, more context on whats going on under the hood. then checked in on trainng, and added cleanup function on another screen to delete the oldest checkpoint 5 mins after a new one is added, so no overload. also caught up writing the notes.
+
+## Done timelaps (30hrs!)
+
+### Starting screen recording on imovie
+
+## September 3 (1hr)
+Checked in on training every hour, bring computer wherever i went. i even checked on the bus. Cleaned up files to give room for error.
+
+## September 4 (1.5hr)
+Crash! looked in the morning, loaded credits and noticed my GPU optim was 0%, training had crashed, it had been going 800 mins, till step 200:
+
+### Crash log:
+
+Depth=20 training -- step 2000 eval crash, root causes found and fixed
+
+Pattern noticed: crashes 3 and 4 both happened at the same spot -- step 
+2000, during nanochat's optional CORE benchmark evaluation (fires once, 
+default every 2000 steps). Not random -- same fragile piece both times.
+
+Crash 3: eval bundle download/extraction filled up the LOCAL disk (30GB, 
+separate from the 250GB network volume). Root cause: despite 
+NANOCHAT_BASE_DIR being set correctly, base_checkpoints were somehow 
+still ALSO saving to the old default /root/.cache/nanochat location in 
+parallel (30GB duplicate, cause not fully understood, but confirmed by 
+directly inspecting the folder). Fixed by deleting that local cache copy 
+-- all real checkpoints were already safe on /workspace.
+
+Crash 4: same eval step, different failure -- it found a leftover, 
+corrupted eval_bundle.zip from crash 3 and tried to use it without 
+re-downloading, failed reading a file that was never fully extracted.
+
+Real fix, not another patch: disabled the CORE eval entirely with 
+--core-metric-every=999999 (nanochat's own documented pattern for 
+skipping it). This benchmark score isn't needed for the project -- not 
+worth the repeated fragility. Permanently closes this failure category 
+for the rest of the run.
+
+Also cleaned up: deleted corrupted eval_bundle files, confirmed local 
+disk back to near-empty, confirmed /root/.cache/nanochat gone.
+
+Process change: before any relaunch now, run a full checklist (session, 
+venv, env vars, checkpoint file sizes, tokenizer, dataset, local disk, 
+network volume, cache clean, eval bundle clean, cleanup loop alive) 
+instead of fixing one error at a time and relaunching blind. Cheaper than 
+another failed multi-hour attempt.
+
+Resumed from step 1800 (last verified-good checkpoint) with the eval 
+disabled going forward.
