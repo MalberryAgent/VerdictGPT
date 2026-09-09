@@ -627,3 +627,176 @@ another failed multi-hour attempt.
 
 Resumed from step 1800 (last verified-good checkpoint) with the eval 
 disabled going forward.
+
+____
+Depth=20 pretraining -- resumed from step 1800, ran to completion
+
+After the step-2000 eval crashes were fixed (core eval disabled 
+permanently), training resumed from step 1800 and ran cleanly the rest 
+of the way -- no further crashes. Full 3320 steps completed.
+
+Final result: CORE metric 0.2274, validation bpb 0.757. Sample 
+generations showed real, coherent, factually correct sentences 
+("capital of France is Paris", "chemical symbol of gold is Au") -- 
+a clear, visible improvement over the old depth=12 base model, which 
+got stuck in repetition loops on the same kind of prompts. This 
+confirmed the core hypothesis behind the whole depth=20 decision: model 
+capacity, not training procedure, was the real limitation before.
+
+Base checkpoint saved at:
+/workspace/nanochat_checkpoints_d20/base_checkpoints/d20/model_003320.pt
+
+#### SFT re-run on the new depth=20 base model
+
+Confirmed nanochat's setup_optimizer() automatically rescales learning 
+rate based on model size -- so the existing SFT script worked correctly 
+on the bigger model with no manual math needed.
+
+Reused the best SFT script from the depth=12 experiments (grad_accum=64), 
+pointed at the new base model and new result folders.
+
+Run 1 (grad_accum=64): finished cleanly, no crashes. Best checkpoint at 
+step 6000, val loss 2.5619 -- clearly better than the best depth=12 
+result (2.8877). Output quality also improved: cleaner grammar, better 
+topic accuracy, first signs of correctly identifying the narrator's own 
+perspective instead of inverting it.
+
+Run 2 (grad_accum=128, doubled again): finished cleanly. Best checkpoint 
+at step 36,000, val loss 2.5310 -- smaller improvement than the last 
+doubling, consistent with diminishing returns as batch size increases. 
+Output quality: best results yet on 2 of 3 test examples, including the 
+first checkpoint to fully correctly identify the narrator as the jealous 
+one (a persistent error in every prior checkpoint). One example (#25) 
+was a clear regression -- garbled, incoherent output. Noted as a real, 
+recurring weak point tied to that specific example's structure, not a 
+new problem -- worth mentioning honestly in the writeup rather than 
+hiding it.
+
+Decision: stopped here. Diminishing returns plus a genuine fix on the 
+main qualitative problem (perspective inversion) made this a reasonable 
+stopping point rather than chasing further incremental batch-size gains.
+
+Final SFT checkpoint (Phase 3 deliverable):
+/workspace/nanochat_checkpoints_d20/sft_d20_v2_best/d20/model_036000.pt
+
+#### Phase 4 (reward model) -- started
+
+Read InstructGPT's reward modeling section. Core concept understood: 
+humans give inconsistent absolute scores but reliable pairwise 
+judgments (A vs B, which is better). The reward model learns a single 
+score per summary such that the DIFFERENCE between two scores, passed 
+through a sigmoid function, predicts the human's actual pairwise choice. 
+Same "compute error, adjust the model" mechanism as every phase before, 
+just a different comparison target -- not absolute correctness, relative 
+preference.
+
+Analogy noted: like chess Elo ratings -- no single game gives a number 
+directly, but enough win/loss results produce a consistent, comparable 
+score for every player.
+
+Next step in progress: loading the actual preference dataset 
+(openai/summarize_from_feedback, 'comparisons' config) to inspect one 
+real example's structure before writing any reward model code.
+
+____
+More notes from this seciton:
+#### Reward model concept -- deeper explanation for review
+
+What problem this phase actually solves
+
+SFT teaches the model to imitate ONE example per prompt. It has no idea 
+if that example was slightly good, very good, or amazing -- it just 
+copies it. This means SFT can't tell the difference between "decent" 
+and "excellent" output, only "matches training example" vs "doesn't."
+
+The reward model's job is to fix that gap: give the model a way to 
+measure QUALITY on a sliding scale, not just imitate a fixed answer.
+
+Why pairwise comparisons instead of direct scores
+
+Humans are bad at consistent absolute ratings. Ask the same person to 
+score a summary today vs next week, the number drifts. But humans are 
+good at "which of these two is better" -- that judgment stays stable.
+
+So the training data is built entirely from these simple A-vs-B choices, 
+never a raw number.
+
+How binary choices turn into a smooth score (the actual mechanism)
+
+1. The reward model looks at a summary and outputs one raw number -- 
+   call it its "score." No inherent meaning yet, just a number.
+
+2. For a pair (summary A, summary B), take scoreA minus scoreB.
+
+3. Pass that difference through a sigmoid function -- squashes any 
+   number into a 0-to-1 range, shaped like an S-curve. Big positive 
+   difference = probability near 1 (very confident A wins). Big 
+   negative = near 0. Near zero difference = uncertain, close to 50/50.
+
+4. Compare that predicted probability against what the human actually 
+   picked. If the human picked A, the "correct" probability was 1. 
+   Compute how wrong the model's prediction was, adjust the model's 
+   weights, same backprop + optimizer mechanic as SFT.
+
+5. Repeat across thousands of pairs. The model is never told "what is 
+   an 8/10 summary" -- it just keeps getting nudged toward giving better 
+   summaries higher raw scores than worse ones, pair after pair.
+
+Why this produces a real, usable scale (not just pairwise labels)
+
+Because the SAME scoring function is reused across every summary the 
+model ever sees, not one function per pair. If A beats B, and B beats C, 
+the model is pressured to keep giving A > B > C consistently, even 
+though it never saw A and C compared directly. Enough pairs force a 
+single, internally consistent ranking to emerge.
+
+Analogy: chess Elo rating. No single match produces a number. But after 
+many win/loss results, a smooth rating emerges that lets you compare 
+even two players who've never played each other.
+
+How this connects to Phase 5 (PPO), coming next
+
+Once the reward model can score any summary, Phase 5 uses that score as 
+the training signal to further improve the SFT model -- generate a 
+summary, ask the reward model "how good is this," and adjust the SFT 
+model to produce higher-scoring summaries over time. This is the actual 
+"RLHF" part -- reward model = the judge, PPO = the process that listens 
+to the judge and improves.
+
+Key structural difference from every phase so far
+
+Phase 1-3 all shared one mechanism: predict the next token, check if 
+right, adjust. Phase 4 breaks that pattern -- it's not predicting text 
+at all. It's outputting a single number and being judged on whether that 
+number correctly ranks two things against each other. Different loss 
+function, different task shape, but same underlying training loop 
+structure (forward pass, compute loss, backward pass, optimizer step).
+
+__________
+
+September 8 ()
+
+Notes on each step:
+
+Reward data: CarperAI/openai_summarize_comparisons (Parquet mirror of 
+OpenAI's dataset, original uses a deprecated loading script). Fields: 
+prompt, chosen, rejected -- already pre-sorted by human preference, no 
+separate label needed.
+Built the reward model. It reuses the same base transformer as SFT, but 
+swaps out the final layer -- instead of predicting the next word, it 
+outputs one single number (a score) for a whole piece of text.
+
+Had to fix one bug: the model's internal math runs in a lower-precision 
+number format (bfloat16), but the new scoring layer defaulted to a 
+different format (float32). Fixed by matching the two.
+
+Tested it on a made-up sentence -- got back one number, no errors. Score 
+itself means nothing yet since this new layer hasn't been trained -- just 
+confirming the plumbing works before training it for real.
+
+First real test of the reward model's loss function. Gave it one human 
+preference pair -- it scored the WORSE summary higher than the better one 
+(expected, since it hasn't learned anything yet, still random). The loss 
+number correctly came out high, meaning the math is working: bad guesses 
+produce high loss, which is exactly what training will fix.
+
