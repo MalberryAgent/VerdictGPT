@@ -774,7 +774,7 @@ structure (forward pass, compute loss, backward pass, optimizer step).
 
 __________
 
-September 8 ()
+## September 8 (2hr)
 
 Notes on each step:
 
@@ -799,4 +799,44 @@ preference pair -- it scored the WORSE summary higher than the better one
 (expected, since it hasn't learned anything yet, still random). The loss 
 number correctly came out high, meaning the math is working: bad guesses 
 produce high loss, which is exactly what training will fix.
+
+
+
+____
+## September 9 ()
+#### Finished phase 4, moving to phase 5.
+Its conceptually harder so, heres the concept:
+The core idea, tied to everything you've built so far: PPO takes your SFT model and improves it further, using your reward model as a "teacher" — but how it does that is fundamentally different from SFT's mechanism. SFT trained on fixed, pre-written examples. PPO has the model generate its own summaries, scores them with the reward model, and adjusts the model to produce higher-scoring summaries over time. The model is learning from its own outputs, not from a fixed dataset.
+Four separate models work together in this phase — a new concept, not seen before:
+Policy model — your SFT model, the one actually being trained and improved right now
+Reference model — a frozen, unchanging copy of that same SFT model, kept purely for comparison
+Reward model — what you just finished building, used to score outputs
+Value model — a new, small helper model that predicts "how good is this partial summary likely to end up," used to make training more stable
+
+### Reading PPO paper (https://arxiv.org/pdf/1707.06347)
+Abstract/intro:
+Lay out the dillima in Reinforcement learning. Algorithms right now are too fragile and wasteful with data, and too complex. Pro solves this by creating a simple safety guard clipping that lets the AI safely reuse recorded experiences multiple times without taking wrong steps.
+PPO: You put a physical stopper on the steering wheel that limits turns to 10 degrees at a time. Because you know you can't accidentally flip the car, you can safely practice driving on the same stretch of road multiple times in a row.
+
+Section 2: Lays out the math and explains why the previous methods either broke or where to complex.
+2.1
+Shows the standard approach to policy optimization uses gradient ascent to make high reward actions more probable. 
+2.2 (TRPO)
+Trust Region Policy Optimization introduces a strict safety boundary based on probability ratios. Underlying Concept: Maximize reward while strictly constraining the KL Divergence (the distance between the old and new action distributions) to be below a hard threshold: The flaw is it creates a hard constraint makes it solve multiple operations from different points, instead of all at once, being inefficient. 
+
+Section 3
+Old RL is bad because it makes big strategy updates to the models data which can send it to be completely off track. Solutions like TRPO helped prevent the catastrophic ones using the heavy constraints that were slow to compute. PPO solves this by placing a simple numerical cap on how much the ai can alter it decisoin capabilities in one step. By using the rule, PPo prevents the model from overheating to sudden rewards or penalties, enhancing the improving of RM.
+
+Section 4/5
+Adding the clipping of the PPOs primary mechinism, section 4 explores the other approach that dynamically increases/decreases a penalty whenever the ai drifts to far, or moves to slowly from the previous state. On top of this, section 5 combines these components into a framework that computes a single unified loss function. The combined goal balances 3 goals at once: Improving desicoin making through clipped rewards, training a critic network to estimate future outcomes, and adding exploration bonus to prevent the model from getting stuck in repetative loops. These bundled, allow an agent to execute multiple training passes on a single batch of collected data using “standard gradient ascent”.
+
+Sections 6 and 7 evaluate PPO across a broad range of continuous robotics simulations and 2D Atari video games, demonstrating that simple objective clipping consistently matches or outperforms far more complex algorithms like TRPO and ACER.
+
+#### Gradient Ascent =
+Imagine a model's performance as a topographic map where elevation represents performance or reward. Gradient ascent calculates the slope (gradient) at the model's current parameter configuration and moves those parameters step-by-step uphill toward higher reward peaks.
+
+
+#### Phase 5 so far:
+
+So far in Phase 5, we've just set up the pieces PPO needs before any actual training happens. We loaded your finished SFT model twice — once as the "policy" (the version that will actually get trained and improved) and once as a frozen "reference" copy that never changes, which exists purely so training can check how far the policy has drifted from where it started. We also loaded your trained reward model from Phase 4 (fixing a real gap along the way — it turned out we'd never actually saved its trained weights to disk the first time, so we reran that training and saved it properly this time) and connected it in as well. Right now we have three of the four required models loaded and confirmed working together; the last piece, a small value model that predicts how good a summary is likely to turn out while it's still being generated, hasn't been built yet.
 
