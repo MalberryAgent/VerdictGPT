@@ -803,7 +803,7 @@ produce high loss, which is exactly what training will fix.
 
 
 ____
-## September 9 ()
+## September 9 (1.5hr)
 #### Finished phase 4, moving to phase 5.
 Its conceptually harder so, heres the concept:
 The core idea, tied to everything you've built so far: PPO takes your SFT model and improves it further, using your reward model as a "teacher" — but how it does that is fundamentally different from SFT's mechanism. SFT trained on fixed, pre-written examples. PPO has the model generate its own summaries, scores them with the reward model, and adjusts the model to produce higher-scoring summaries over time. The model is learning from its own outputs, not from a fixed dataset.
