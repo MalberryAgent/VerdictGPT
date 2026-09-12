@@ -1,4 +1,4 @@
+.venv/
 wandb/
-wandb/
-wandb/
-wandb/
+__pycache__/
+*.pyc
