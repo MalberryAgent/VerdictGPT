@@ -840,3 +840,41 @@ Imagine a model's performance as a topographic map where elevation represents pe
 
 So far in Phase 5, we've just set up the pieces PPO needs before any actual training happens. We loaded your finished SFT model twice — once as the "policy" (the version that will actually get trained and improved) and once as a frozen "reference" copy that never changes, which exists purely so training can check how far the policy has drifted from where it started. We also loaded your trained reward model from Phase 4 (fixing a real gap along the way — it turned out we'd never actually saved its trained weights to disk the first time, so we reran that training and saved it properly this time) and connected it in as well. Right now we have three of the four required models loaded and confirmed working together; the last piece, a small value model that predicts how good a summary is likely to turn out while it's still being generated, hasn't been built yet.
 
+
+____
+## September 10 (
+
+next is building the value model, the fourth and final piece needed before PPO's actual training loop
+The value model's job, in plain terms: while the policy model is generating a summary token by token, the value model looks at what's been generated so far and predicts "given this partial summary, how good do I think the final reward score will end up being." This running prediction is what makes PPO's updates stable — instead of only learning from the final reward at the very end, the model gets a sense of progress at every step along the way.
+
+- All 4 models ran successful
+
+Next: the actual PPO training loop itself — the most complex piece of this entire project. Given its complexity, we'll build it in stages, same discipline as SFT
+
+#### notes.md digest
+Phase 5 setup complete: all four PPO models (policy, frozen reference, 
+frozen trained reward model, fresh value model) load together in memory 
+with room to spare (10GB used of 24GB). Confirmed the policy model can 
+generate real summaries within this same setup -- this is the actual 
+text PPO will score and learn from, not fixed dataset examples like SFT used.
+
+Confirmed the reward model can score the policy's own live-generated 
+text, not just fixed dataset examples. This is the actual signal PPO 
+will use to improve the model -- generate a summary, score it, then 
+adjust the model to produce higher-scoring summaries over time.
+
+KL divergance, the way to tell how far the model has drifted from where it started 
+Generated summary:  I think it's a good thing to open a secret communication that might be able to show her that she's hurt so and wants to change the rut we both live in (which is really starting to open), but she wants us back together.
+Reward score for generated summary: 70.0
+KL divergence (policy vs reference): 0.0
+
+#### Here's how the four pieces combine into PPO's actual training signal
+
+The goal: make the policy generate summaries that score higher, without letting it change too recklessly in one step.
+Advantage: reward score minus what the value model expected. Positive means "better than expected", do more of this, but  negetive is worse than expected, do less of that.
+The safety trick (what "PPO" actually means): instead of just pushing hard toward high-advantage outputs, it compares the model's current confidence in a token to its confidence just before this update, and caps how much that ratio is allowed to shift.
+The drift penalty: before any of this, we subtract a penalty based on how far the policy's token probabilities have drifted from the frozen reference model. Score well, but drift too far from where you started, and the effective reward gets reduced. This is the actual mechanism that stops reward hacking (no cheating), and is lead by KL divergence
+
+generate → score → penalize for drifting too far → compare to expectations → nudge gently, capped, toward what worked → also teach the value model to predict better next time.
+
+
