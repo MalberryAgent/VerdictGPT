@@ -842,7 +842,7 @@ So far in Phase 5, we've just set up the pieces PPO needs before any actual trai
 
 
 ____
-## September 10 (
+## September 10 (2hr)
 
 next is building the value model, the fourth and final piece needed before PPO's actual training loop
 The value model's job, in plain terms: while the policy model is generating a summary token by token, the value model looks at what's been generated so far and predicts "given this partial summary, how good do I think the final reward score will end up being." This running prediction is what makes PPO's updates stable — instead of only learning from the final reward at the very end, the model gets a sense of progress at every step along the way.
@@ -877,4 +877,49 @@ The drift penalty: before any of this, we subtract a penalty based on how far th
 
 generate → score → penalize for drifting too far → compare to expectations → nudge gently, capped, toward what worked → also teach the value model to predict better next time.
 
+___
+## September 11 (
+
+#### Now running first real PPO train (100 steps, save every 20)
+cd /workspace/VerdictGPT
+source .venv/bin/activate
+export HF_HOME=/workspace/hf_cache
+export HF_HUB_DISABLE_XET=1
+export NANOCHAT_BASE_DIR=/workspace/nanochat_checkpoints_d20
+export PYTHONPATH=/workspace/nanochat:$PYTHONPATH
+python3 ppo_train_full.py
+
+
+Inside screen session, reatach with: screen -r ppo_final
+
+After that run, it seems that the reward value was being weird, varying from -70 to 60, and no steady or clear ascent trend. also some consecutive rollouts show the same rewards, which is no good, means it got stuck in a loop, generating duplicates for a bit.
+But before making up offsetting predictions, lets test it, and compare runs before and after the training.
+
+Failed.
+=== Example 0 ===
+Generated:  Where the fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck fuck
+
+=== Example 5 ===
+Generated:  Why the high interest loan payment and opt for a minimal downpayment? if a lower interest loan payment is beneficial to the business.  What would you advise in my shoes towards a company that has had no problems? 
+
+=== Example 10 ===
+Generated:  Where the fuck do I put this? It's hard to talk to HR if there's something wrong or what I do and what I should do about it.
+
+(.venv) root@b562fa4d4dc6:/workspace/VerdictGPT# 
+
+This is a collapse, the model found a shortcut phrase (fuck) as it tends to score well on the reward model.
+
+Conduct test after small change, in normal terminal, no screen, changed number of rollouts (only 10)
+
+Now 6different sections of runs, train, full, rollout, test, show_result, and reward_sanity
+Found out its not a broken reward model from runing sanity check rollout, in the check, the garbage text scored lower than the normal summary. So its actuially the ppo training loops fault
+
+#### Hopefullt:
+real, confirmed root cause. Every 4 consecutive indices show the exact same post. This is the actual bug, and it explains everything: not a PPO instability problem, not a reward model problem, not a missing-clipping problem. The dataset itself has each unique post repeated 4 times in a row — almost certainly because CarperAI/openai_summarize_comparisons stores multiple comparison pairs per post (a common structure: one post, several different human-judged summary pairs), and consecutive rows share the same post with different summary pairs, not different posts entirely.
+
+### Failed
+
+PPO was implemented with all four required models (policy, frozen reference, trained reward model, value model) working correctly together. During testing, a real data bug was found and fixed: the dataset was accidentally serving the same post four times in a row, which had been causing the model to generate identical output regardless of input. Once fixed, PPO started training on genuinely varied data — but revealed a separate, real problem: the model learned to chase the reward model by injecting aggressive language ("Why the fuck...") into nearly every summary, regardless of the actual post content. This is a well-known, documented PPO failure mode called reward hacking, not a bug in the code — it happens because the reward model, trained on real but imperfect human preference data, imperfectly rewards this kind of language.
+
+Decision: stop here. The SFT model remains the best-quality, most reliable output from this project and will be used as the actual deliverable. This PPO result is kept and documented as a real, working implementation that surfaced a genuine, well-known limitation of the technique — not a failure to get something running, but an honest demonstration of why RLHF is hard to get right in practice.
 
